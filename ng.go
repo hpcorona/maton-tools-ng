@@ -40,6 +40,13 @@ func main() {
     return
   }
 
+  fmt.Printf("Match Test: %v\n",
+    match("output/**/source.java", "output/file/one/two/three/source.java", true))
+  fmt.Printf("Match Test: %v\n",
+    match("**/*.java", "my/pkg/File.java", true))
+  fmt.Printf("Match Test: %v\n",
+    match("*.java", "my/pkg/File.java", true))
+
   fmt.Printf("Nailgun\n")
   fmt.Printf("ng file:    %s\n", ngfile)
   fmt.Printf("work dir:   %s\n", work)
@@ -53,3 +60,4 @@ func main() {
 
   defer finish()
 }
+

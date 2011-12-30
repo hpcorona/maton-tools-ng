@@ -43,6 +43,7 @@ func loadFunctions(ctx *v8.V8Context) {
 	ctx.AddFunc("_fs_truncate", fs_truncate)
 	ctx.AddFunc("_fs_isDir", fs_isDir)
 	ctx.AddFunc("_fs_ls", fs_ls)
+  ctx.AddFunc("_fs_lsn", fs_lsn)
 
 	ctx.Eval(`
   this.fs =
@@ -59,7 +60,8 @@ func loadFunctions(ctx *v8.V8Context) {
       "link": function(v0, v1) { _fs_link(v0, v1); },
       "truncate": function(v0, v1) { _fs_truncate(v0, v1); },
       "isDir": function(args) { return _fs_isDir(args); },
-      "ls": function(args) { return _fs_ls(args); }
+      "ls": function() { return _fs_ls.apply(this, arguments); },
+      "lsn": function() { return _fs_lsn.apply(this, arguments); }
     };
   `)
 
@@ -100,6 +102,16 @@ func paramMin(value []interface{}, pmin int, fname string) {
 
 	if len(value) < pmin {
 		panic(fmt.Sprintf("%s must have a minimum of %d parameter(s); %d passed\n{%v}\n", fname, pmin, len(value), value))
+	}
+}
+
+func paramMax(value []interface{}, pmax int, fname string) {
+  if value == nil && pmax == 0 {
+    return
+  }
+
+	if len(value) > pmax {
+		panic(fmt.Sprintf("%s must have a maximum of %d parameter(s); %d passed\n{%v}\n", fname, pmax, len(value), value))
 	}
 }
 
@@ -383,17 +395,79 @@ func fs_isDir(value ...interface{}) interface{} {
 }
 
 func fs_ls(value ...interface{}) interface{} {
-	files, err := ioutil.ReadDir(value[0].(string))
+  paramMin(value, 1, "fs.ls")
+  paramMax(value, 3, "fs.ls")
+
+  path := value[0].(string)
+  matchp := ""
+  if len(value) > 1 {
+    matchp = value[1].(string)
+  }
+  cs := true
+  if len(value) > 2 {
+    cs = value[2].(bool)
+  }
+
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	filess := make([]string, len(files))
+	filess := make([]string, 0, len(files))
 
 	for i := 0; i < len(files); i++ {
-		filess[i] = files[i].Name()
+    name := files[i].Name()
+    if matchp == "" {
+      filess = append(filess, filepath.Join(path, name))
+    } else {
+      if match(matchp, name, cs) {
+        filess = append(filess, filepath.Join(path, name))
+      }
+    }
 	}
 
 	return filess
+}
+
+func listDir(mp MatchPattern, cs bool, path string, prefix string) []string {
+  files, err := ioutil.ReadDir(path)
+  if err != nil {
+    panic(err.Error())
+  }
+
+  filess := make([]string, 0, len(files))
+
+  for i := 0; i < len(files); i++ {
+    name := filepath.Join(prefix, files[i].Name())
+    if mp.Match(name, cs) {
+      filess = append(filess, name)
+    }
+
+    if files[i].IsDir() {
+      filess = append(filess, listDir(mp, cs, name, name)...)
+    }
+  }
+
+  return filess
+}
+
+func fs_lsn(value ...interface{}) interface{} {
+  paramMin(value, 1, "fs.lsn")
+  paramMax(value, 3, "fs.lsn")
+
+  path := value[0].(string)
+  var matchp MatchPattern
+  if len(value) > 1 {
+    matchp = NewMatchPattern(value[1].(string))
+  }
+  cs := true
+  if len(value) > 2 {
+    cs = value[2].(bool)
+  }
+
+  if path == "" {
+    return listDir(matchp, cs, ".", "")
+  }
+  return listDir(matchp, cs, path, filepath.Clean(path))
 }
 
