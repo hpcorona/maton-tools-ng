@@ -86,6 +86,15 @@ func loadFunctions(ctx *v8.V8Context) {
       "splitList": function(args) { return _path_splitList(args); }
     };
   `)
+
+  // ng functions
+  ctx.AddFunc("_ng_i", ng_i)
+
+  ctx.Eval(`
+    this.ng = {
+      "i": function() { return _ng_i.apply(this, arguments); }
+    };
+  `)
 }
 
 func paramCount(value []interface{}, pcount int, fname string) {
@@ -116,6 +125,50 @@ func paramMax(value []interface{}, pmax int, fname string) {
 	if len(value) > pmax {
 		panic(fmt.Sprintf("%s must have a maximum of %d parameter(s); %d passed\n{%v}\n", fname, pmax, len(value), value))
 	}
+}
+
+func push_ngdir(file string) {
+  abs := absfile(file)
+  dir, _ := filepath.Split(abs)
+
+  ngdirs = append(ngdirs, dir)
+}
+
+func pop_ngdir() {
+  ngdirs = ngdirs[: len(ngdirs) - 1]
+}
+
+func get_ngdir() string {
+  return ngdirs[len(ngdirs) - 1]
+}
+
+func get_absjs(file string) string {
+  file = filepath.Clean(file)
+  if strings.HasPrefix(file, "/") {
+    return file
+  }
+  return filepath.Join(get_ngdir(), file)
+}
+
+func load_js(file string) {
+  file = get_absjs(file)
+  push_ngdir(file)
+  ngdata, err := ioutil.ReadFile(file)
+  if err != nil {
+    panic(err.Error())
+  }
+  context.Eval(string(ngdata))
+  pop_ngdir()
+}
+
+func ng_i(value ...interface{}) interface{} {
+  paramMin(value, 1, "ng.i")
+
+  for i := 0; i < len(value); i++ {
+    load_js(value[i].(string))
+  }
+
+  return true
 }
 
 func path_clean(value ...interface{}) interface{} {

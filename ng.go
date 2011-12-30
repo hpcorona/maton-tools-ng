@@ -7,10 +7,13 @@ import (
   "os"
   "time"
   "io/ioutil"
+  "path/filepath"
+  "strings"
 )
 
 var context *v8.V8Context
 var startTime time.Time
+var ngdirs []string
 
 func localTime() time.Time {
   return time.Now()
@@ -25,8 +28,19 @@ func finish() {
   fmt.Printf("Script finished\n")
 }
 
+func absfile(file string) string {
+  cleaned := filepath.Clean(file)
+
+  if strings.HasPrefix(cleaned, "/") {
+    return cleaned
+  }
+  wd, _ := os.Getwd()
+  return filepath.Join(wd, cleaned)
+}
+
 func main() {
   startTime = localTime()
+  ngdirs = make([]string, 1, 20)
 
   var ngfile = "ng.js"
   var work, _ = os.Getwd()
@@ -40,15 +54,11 @@ func main() {
     return
   }
 
-  fmt.Printf("Match Test: %v\n",
-    match("output/**/source.java", "output/file/one/two/three/source.java", true))
-  fmt.Printf("Match Test: %v\n",
-    match("**/*.java", "my/pkg/File.java", true))
-  fmt.Printf("Match Test: %v\n",
-    match("*.java", "my/pkg/File.java", true))
+  ngdirs[0], ngfile = filepath.Split(absfile(ngfile))
 
   fmt.Printf("Nailgun\n")
   fmt.Printf("ng file:    %s\n", ngfile)
+  fmt.Printf("ng dir:     %s\n", ngdirs[0])
   fmt.Printf("work dir:   %s\n", work)
 
   os.Chdir(work)
@@ -56,7 +66,10 @@ func main() {
   context = v8.NewContext()
   loadFunctions(context)
 
-  context.Eval(string(ngdata))
+  _, err = context.Eval(string(ngdata))
+  if err != nil {
+    fmt.Printf("=====\nERROR\n=====\n%s:%s", ngfile, err.Error())
+  }
 
   defer finish()
 }
