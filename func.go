@@ -1,6 +1,7 @@
 package main
 
 import (
+  "strings"
 	"fmt"
 	"github.com/hpcorona/go-v8/v8"
 	"io"
@@ -32,6 +33,7 @@ func loadFunctions(ctx *v8.V8Context) {
 	// file system functions
 	ctx.AddFunc("_fs_cd", fs_cd)
 	ctx.AddFunc("_fs_cp", fs_cp)
+  ctx.AddFunc("_fs_cpt", fs_cpt)
 	ctx.AddFunc("_fs_mv", fs_mv)
 	ctx.AddFunc("_fs_touch", fs_touch)
 	ctx.AddFunc("_fs_rm", fs_rm)
@@ -50,6 +52,7 @@ func loadFunctions(ctx *v8.V8Context) {
     {
       "cd": function(args) { _fs_cd(args); },
       "cp": function(v0, v1) { _fs_cp(v0, v1); },
+      "cpt": function(v0, v1) { _fs_cpt(v0, v1); },
       "mv": function(v0, v1) { _fs_mv(v0, v1); },
       "touch": function(args) { _fs_touch(args); },
       "rm": function(args) { _fs_rm(args); },
@@ -145,7 +148,16 @@ func path_join(value ...interface{}) interface{} {
 func path_split(value ...interface{}) interface{} {
 	dir, file := filepath.Split(value[0].(string))
 
-	return []string{dir, file}
+  idx := strings.LastIndex(file, ".")
+  base := file
+  ext := ""
+
+  if idx >= 0 {
+    base = file[0 : idx]
+    ext = file[idx : ]
+  }
+
+	return []string{dir, file, base, ext}
 }
 
 func path_splitList(value ...interface{}) interface{} {
@@ -250,6 +262,18 @@ func fs_cp(value ...interface{}) interface{} {
 	}
 
 	return true
+}
+
+func fs_cpt(value ...interface{}) interface{} {
+  paramCount(value, 2, "fs.cpt")
+
+  src := value[0].(string)
+  dst := value[1].(string)
+
+  _, f := filepath.Split(src)
+  dstf := filepath.Join(dst, f)
+
+  return fs_cp(src, dstf)
 }
 
 func fs_mv(value ...interface{}) interface{} {
