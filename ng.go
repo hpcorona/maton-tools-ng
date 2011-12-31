@@ -69,6 +69,23 @@ func main() {
   _, err = context.Eval(string(ngdata))
   if err != nil {
     fmt.Printf("=====\nERROR\n=====\n%s:%s", ngfile, err.Error())
+    return
+  }
+
+  task := defTask
+  if flag.NArg() > 0 {
+    task = flag.Arg(0)
+  }
+  if task == "" || task == "?" {
+    if task == "" {
+      fmt.Printf("No default task defined.\n")
+    }
+    showHelp()
+  } else {
+    tst := runTask(task)
+    if !tst {
+      fmt.Printf("Error while trying to run the task %s\n", task)
+    }
   }
 
   defer finish()

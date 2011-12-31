@@ -46,6 +46,7 @@ func loadFunctions(ctx *v8.V8Context) {
 	ctx.AddFunc("_fs_isDir", fs_isDir)
 	ctx.AddFunc("_fs_ls", fs_ls)
   ctx.AddFunc("_fs_lsn", fs_lsn)
+  ctx.AddFunc("_fs_wd", fs_wd)
 
 	ctx.Eval(`
   this.fs =
@@ -64,7 +65,8 @@ func loadFunctions(ctx *v8.V8Context) {
       "truncate": function(v0, v1) { _fs_truncate(v0, v1); },
       "isDir": function(args) { return _fs_isDir(args); },
       "ls": function() { return _fs_ls.apply(this, arguments); },
-      "lsn": function() { return _fs_lsn.apply(this, arguments); }
+      "lsn": function() { return _fs_lsn.apply(this, arguments); },
+      "wd": function() { return _fs_wd(); }
     };
   `)
 
@@ -88,11 +90,15 @@ func loadFunctions(ctx *v8.V8Context) {
   `)
 
   // ng functions
-  ctx.AddFunc("_ng_i", ng_i)
+  ctx.AddFunc("_ng_include", ng_include)
+  ctx.AddFunc("_ng_task", ng_task)
+  ctx.AddFunc("_ng_default", ng_default)
 
   ctx.Eval(`
     this.ng = {
-      "i": function() { return _ng_i.apply(this, arguments); }
+      "include": function() { return _ng_include.apply(this, arguments); },
+      "task": function() { return _ng_task.apply(this, arguments); },
+      "default": function(tn) { return _ng_default(tn); }
     };
   `)
 }
@@ -161,14 +167,46 @@ func load_js(file string) {
   pop_ngdir()
 }
 
-func ng_i(value ...interface{}) interface{} {
-  paramMin(value, 1, "ng.i")
+func ng_include(value ...interface{}) interface{} {
+  paramMin(value, 1, "ng.include")
 
   for i := 0; i < len(value); i++ {
     load_js(value[i].(string))
   }
 
   return true
+}
+
+func ng_task(value ...interface{}) interface{} {
+  paramMin(value, 3, "ng.task")
+  paramMax(value, 4, "ng.task")
+
+  funcName := value[0].(string)
+  taskName := value[1].(string)
+  desc := value[2].(string)
+
+  var deps []string
+  if len(value) < 4 {
+    deps = make([]string, 0)
+  } else {
+    intd, ok := value[3].([]interface{})
+    if ok {
+      deps = make([]string, len(intd))
+      for i := 0; i < len(intd); i++ {
+        deps[i] = intd[i].(string)
+      }
+    } else {
+      deps = make([]string, 1)
+      deps[0] = value[3].(string)
+    }
+  }
+  return newTask(taskName, desc, deps, funcName)
+}
+
+func ng_default(value ...interface{}) interface{} {
+  paramCount(value, 1, "ng.default")
+
+  return defaultTask(value[0].(string))
 }
 
 func path_clean(value ...interface{}) interface{} {
@@ -307,12 +345,23 @@ func fs_cp(value ...interface{}) interface{} {
 	if err != nil {
 		panic(err.Error())
 	}
-	defer df.Close()
 
 	_, err = io.Copy(df, sf)
 	if err != nil {
 		panic(err.Error())
 	}
+  df.Close()
+
+  finfo, err := os.Stat(src)
+  if err != nil {
+    panic(err.Error())
+  }
+  dof, err := os.Open(dst)
+  if err != nil {
+    panic(err.Error())
+  }
+  os.Chmod(dst, uint32(finfo.Mode()))
+  dof.Close()
 
 	return true
 }
@@ -398,7 +447,7 @@ func fs_mkdir(value ...interface{}) interface{} {
 
   fmt.Printf("Create directory '%s'.\n", dst)
 
-	err := os.MkdirAll(dst, 444)
+	err := os.MkdirAll(dst, 2147484141)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -521,7 +570,8 @@ func listDir(mp MatchPattern, cs bool, path string, prefix string) []string {
     }
 
     if files[i].IsDir() {
-      filess = append(filess, listDir(mp, cs, name, name)...)
+      newpath := filepath.Join(path, files[i].Name())
+      filess = append(filess, listDir(mp, cs, newpath, name)...)
     }
   }
 
@@ -545,6 +595,14 @@ func fs_lsn(value ...interface{}) interface{} {
   if path == "" {
     return listDir(matchp, cs, ".", "")
   }
-  return listDir(matchp, cs, path, filepath.Clean(path))
+  return listDir(matchp, cs, path, "")
+}
+
+func fs_wd(value ...interface{}) interface{} {
+  paramCount(value, 0, "fs.wd")
+
+  path, _ := os.Getwd()
+
+  return path
 }
 
