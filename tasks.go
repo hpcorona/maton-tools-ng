@@ -1,7 +1,6 @@
 package main
 
 import (
-  "flag"
   "encoding/json"
   "text/template"
   "bytes"
@@ -68,20 +67,9 @@ func queueTask(name string) bool {
   return true
 }
 
-func runTask(name string) bool {
+func runTask(name string, params []string) bool {
   if !queueTask(name) {
     return false
-  }
-
-  var params []string
-
-  if flag.NArg() > 1 {
-    params := make([]string, flag.NArg() - 1)
-    for i := 0; i < len(params); i++ {
-      params[i] = flag.Arg(i + 1)
-    }
-  } else {
-    params = make([]string, 0)
   }
 
   v, _ := json.Marshal(params)

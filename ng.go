@@ -88,7 +88,7 @@ func main() {
     }
     showHelp()
   } else {
-    tst := runTask(task)
+    tst := runTask(task, flag.Args())
     if !tst {
       fmt.Printf("Error while trying to run the task %s\n", task)
     }
@@ -96,4 +96,3 @@ func main() {
 
   defer finish()
 }
-
