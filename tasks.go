@@ -21,7 +21,7 @@ var queuedTasks = make([]string, 0, 10)
 var defTask string = ""
 
 var runTaskTpl = template.Must(template.New("runTask").Parse(`
-{{.name}}({{.params}});
+{{.Name}}({{.Params}});
 `))
 
 func newTask(name, description string, depends []string, function string) bool {
@@ -92,8 +92,8 @@ func runTask(name string) bool {
 
     b := bytes.NewBufferString("")
     runTaskTpl.Execute(b, map[string]interface{} {
-        "name": task.Function,
-        "params": string(v),
+        "Name": task.Function,
+        "Params": string(v),
       })
     _, err := context.Eval(b.String())
     if err != nil {

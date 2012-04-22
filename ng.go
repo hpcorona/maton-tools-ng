@@ -3,7 +3,7 @@ package main
 import (
   "fmt"
   "flag"
-  "github.com/hpcorona/go-v8/v8"
+  "github.com/hpcorona/go-v8"
   "os"
   "time"
   "io/ioutil"
@@ -39,6 +39,12 @@ func absfile(file string) string {
 }
 
 func main() {
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("error: %v\n", x)
+		}
+	}()
+	
   startTime = localTime()
   ngdirs = make([]string, 1, 20)
 
