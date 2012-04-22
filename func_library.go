@@ -143,7 +143,7 @@ Project.prototype = {
 			
 			config.platforms = [ _platform ];
 			config.configurations = [ _config ];
-			config.outpath = path.join(_outputbase, config.name, cname);
+			config.outpath = path.join(_outputbase, cname, config.name);
 			config.platform = _platform;
 			config.configuration = _config;
 			
