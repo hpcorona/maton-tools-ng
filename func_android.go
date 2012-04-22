@@ -11,6 +11,167 @@ function AndroidGenerator() {
 }
 
 AndroidGenerator.prototype = new Generator();
+
+AndroidGenerator.prototype.workspace = function(_path) {
+	fs.mkdir(path.join(_path, ".metadata"));
+	var projsdir = path.join(_path, ".metadata", ".plugins", "org.eclipse.core.resources", ".projects");
+	fs.mkdir(projsdir);
+	
+	fs.write(path.join(_path, ".metadata", "version.ini"), "org.eclipse.core.runtime=1");
+	
+	for (var i in Library.buildStack) {
+		fs.mkdir(path.join(projsdir, Library.buildStack[i], "org.eclipse.jdt.core"));
+	}
+}
+
+AndroidGenerator.prototype.genProject = function(_project) {
+	var dot_classpath_tpl = '\
+<?xml version="1.0" encoding="UTF-8"?>\n\
+<classpath>\n\
+	<classpathentry kind="src" path="java"/>\n\
+	<classpathentry kind="src" path="gen"/>\n\
+{{#spec.linked_sources}}\n\
+	<classpathentry kind="src" path="{{name}}"/>\n\
+{{/spec.linked_sources}}\n\
+{{#spec.java}}\n\
+	<classpathentry kind="src" path="code"/>\n\
+{{/spec.java}}\n\
+	<classpathentry kind="con" path="com.android.ide.eclipse.adt.ANDROID_FRAMEWORK"/>\n\
+	<classpathentry kind="con" path="com.android.ide.eclipse.adt.LIBRARIES"/>\n\
+{{#spec.jars}}\n\
+	<classpathentry kind="lib" path="{{.}}"/>\n\
+{{/spec.jars}}\n\
+	<classpathentry kind="output" path="bin/classes"/>\n\
+</classpath>\n\
+';
+	var dot_project_tpl = '\
+<?xml version="1.0" encoding="UTF-8"?>\n\
+<projectDescription>\n\
+	<name>{{name}}</name>\n\
+	<comment></comment>\n\
+	<projects>\n\
+	</projects>\n\
+	<buildSpec>\n\
+		<buildCommand>\n\
+			<name>org.eclipse.cdt.managedbuilder.core.genmakebuilder</name>\n\
+			<triggers>clean,full,incremental,</triggers>\n\
+			<arguments>\n\
+				<dictionary>\n\
+					<key>?children?</key>\n\
+					<value>?name?=outputEntries\\|?children?=?name?=entry\\\\\\\\\\\\\\|\\\\\\|\\||</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>?name?</key>\n\
+					<value></value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.append_environment</key>\n\
+					<value>true</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.buildArguments</key>\n\
+					<value></value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.buildCommand</key>\n\
+					<value>ndk-build</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.cleanBuildTarget</key>\n\
+					<value>clean</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.contents</key>\n\
+					<value>org.eclipse.cdt.make.core.activeConfigSettings</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.enableAutoBuild</key>\n\
+					<value>false</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.enableCleanBuild</key>\n\
+					<value>true</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.enableFullBuild</key>\n\
+					<value>true</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.fullBuildTarget</key>\n\
+					<value>V=1</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.stopOnError</key>\n\
+					<value>true</value>\n\
+				</dictionary>\n\
+				<dictionary>\n\
+					<key>org.eclipse.cdt.make.core.useDefaultBuildCmd</key>\n\
+					<value>true</value>\n\
+				</dictionary>\n\
+			</arguments>\n\
+		</buildCommand>\n\
+		<buildCommand>\n\
+			<name>com.android.ide.eclipse.adt.ResourceManagerBuilder</name>\n\
+			<arguments>\n\
+			</arguments>\n\
+		</buildCommand>\n\
+		<buildCommand>\n\
+			<name>com.android.ide.eclipse.adt.PreCompilerBuilder</name>\n\
+			<arguments>\n\
+			</arguments>\n\
+		</buildCommand>\n\
+		<buildCommand>\n\
+			<name>org.eclipse.jdt.core.javabuilder</name>\n\
+			<arguments>\n\
+			</arguments>\n\
+		</buildCommand>\n\
+		<buildCommand>\n\
+			<name>com.android.ide.eclipse.adt.ApkBuilder</name>\n\
+			<arguments>\n\
+			</arguments>\n\
+		</buildCommand>\n\
+		<buildCommand>\n\
+			<name>org.eclipse.cdt.managedbuilder.core.ScannerConfigBuilder</name>\n\
+			<triggers>full,incremental,</triggers>\n\
+			<arguments>\n\
+			</arguments>\n\
+		</buildCommand>\n\
+	</buildSpec>\n\
+	<natures>\n\
+		<nature>com.android.ide.eclipse.adt.AndroidNature</nature>\n\
+		<nature>org.eclipse.jdt.core.javanature</nature>\n\
+		<nature>org.eclipse.cdt.core.cnature</nature>\n\
+		<nature>org.eclipse.cdt.core.ccnature</nature>\n\
+		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>\n\
+		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>\n\
+	</natures>\n\
+	<linkedResources>\n\
+{{#spec.linked_sources}}\n\
+		<link>\n\
+			<name>{{name}}</name>\n\
+			<type>2</type>\n\
+			<location>{{location}}</location>\n\
+		</link>\n\
+{{/spec.linked_sources}}\n\
+{{#spec.java}}\n\
+		<link>\n\
+			<name>code</name>\n\
+			<type>2</type>\n\
+			<location>{{spec.java}}</location>\n\
+		</link>\n\
+{{/spec.java}}\n\
+	</linkedResources>\n\
+</projectDescription>\n\
+';
+	
+	fs.mkdir(path.join(_project.outpath, "java"));
+	fs.mkdir(path.join(_project.outpath, "gen"));
+	fs.mkdir(path.join(_project.outpath, "bin/classes"));
+	
+	fs.write(path.join(_project.outpath, ".classpath"), Mustache.render(dot_classpath_tpl, _project));
+	fs.write(path.join(_project.outpath, ".project"), Mustache.render(dot_project_tpl, _project));
+}
+
 AndroidGenerator.prototype.generate = function(_project) {
 	var android = {
 		apppath: (_project.type == "application" ? _project.outpath : null),
@@ -37,8 +198,8 @@ AndroidGenerator.prototype.generate = function(_project) {
 	fs.rmdir(android.path);
 	fs.mkdir(android.path);
 	fs.symlink(_project.basepath, android.source);
-	
 	fs.mkdir(path.join(android.path, "jni"));
+	this.genProject(_project);
 	
 	var android_mk = path.join(android.path, "jni", "Android.mk");
 	var android_mk_tpl = "\

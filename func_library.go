@@ -128,8 +128,6 @@ Project.prototype = {
 		},
 		
 		target: function(_platform, _config, _outputbase) {
-			var cname = Mustache.render("{{platform}}_{{config}}", {platform: _platform, config: _config});
-			
 			var config = this.clone();
 			
 			for (var i in this.configurators) {
@@ -143,7 +141,7 @@ Project.prototype = {
 			
 			config.platforms = [ _platform ];
 			config.configurations = [ _config ];
-			config.outpath = path.join(_outputbase, cname, config.name);
+			config.outpath = path.join(_outputbase, config.name);
 			config.platform = _platform;
 			config.configuration = _config;
 			
@@ -174,6 +172,8 @@ var Library = (typeof module !== "undefined" && module.exports) || {};
 	exports.projects = {};
 	exports.buildStack = [];
 	exports.targetProjects = {};
+	exports.generator = null;
+	exports.workspace = null;
 	
 	exports.addProjects = function(_project) {
 		var _projects = [].concat(_project);
@@ -195,11 +195,23 @@ var Library = (typeof module !== "undefined" && module.exports) || {};
 	exports.clearBuildStack = function() {
 		exports.buildStack = [];
 		exports.targetProjects = {};
+		exports.generator = null;
+		exports.workspace = null;
 	}
 	
 	exports.target = function(_projname, _platform, _config, _outputbase) {
 		if (exports.targetProjects[_projname] != null) {
 			return true;
+		}
+		
+		if (exports.generator == null) {
+			if (_platform == "android") {
+				exports.generator = new AndroidGenerator();
+				exports.workspace = path.join(_outputbase, _platform + "_" + _config);
+			} else {
+				os.error("Unsupported generator: " + _platform);
+				return false;
+			}
 		}
 		
 		var _proj = exports.projects[_projname];
@@ -212,11 +224,11 @@ var Library = (typeof module !== "undefined" && module.exports) || {};
 			var _dprojname = _proj.depends[i];
 			
 			if (exports.targetProjects[_dprojname] == null) {
-				exports.target(_dprojname, _platform, _config, _outputbase);
+				exports.target(_dprojname, _platform, _config, exports.workspace);
 			}
 		}
 		
-		var t = _proj.target(_platform, _config, _outputbase);
+		var t = _proj.target(_platform, _config, exports.workspace);
 		exports.buildStack.push(t.name);
 		exports.targetProjects[_projname] = t;
 		
@@ -255,16 +267,12 @@ var Library = (typeof module !== "undefined" && module.exports) || {};
 	}
 	
 	exports.configure = function() {
-		var agen = new AndroidGenerator();
+		exports.generator.workspace(exports.workspace);
+		
 		for (var i in exports.buildStack) {
 			var t = Library.getTarget(exports.buildStack[i]);
-			if (t.platform == "android") {
-				t.generator = agen;
-				t.configure();
-			} else {
-				os.error("Generator not available for " + t.platform);
-				return;
-			}
+			t.generator = exports.generator;
+			t.configure();
 		}
 	}
 	
@@ -294,6 +302,8 @@ Generator.prototype = {
 	configure: function(_project) {
 	},
 	finalize: function(_project) {
+	},
+	workspace: function(_path) {
 	}
 }
 `
