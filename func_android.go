@@ -107,7 +107,6 @@ AndroidGenerator.prototype.genProject = function(_project) {
 	<classpathentry kind="src" path="{{name}}"/>\n\
 {{/spec.linked_sources}}\n\
 {{#spec.java}}\n\
-	<classpathentry kind="src" path="code"/>\n\
 {{/spec.java}}\n\
 	<classpathentry kind="con" path="com.android.ide.eclipse.adt.ANDROID_FRAMEWORK"/>\n\
 	<classpathentry kind="con" path="com.android.ide.eclipse.adt.LIBRARIES"/>\n\
@@ -219,27 +218,38 @@ AndroidGenerator.prototype.genProject = function(_project) {
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>\n\
 	</natures>\n\
 	<linkedResources>\n\
-{{#spec.linked_sources}}\n\
-		<link>\n\
-			<name>{{name}}</name>\n\
-			<type>2</type>\n\
-			<location>{{location}}</location>\n\
-		</link>\n\
-{{/spec.linked_sources}}\n\
 	</linkedResources>\n\
 </projectDescription>\n\
 ';
+
+	var source_dirs = [];
+	
+	for (var i in _project.spec.linked_sources) {
+		fs.symlink(_project.spec.linked_sources[i].location, path.join(_project.outpath, _project.spec.linked_sources[i].name));
+		source_dirs.push(_project.spec.linked_sources[i].name);
+	}
+	
+	var libsdir = path.join(_project.outpath, "libs");
+	fs.mkdir(libsdir);
+	for (var i in _project.spec.jars) {
+		fs.cpt(_project.spec.jars[i], libsdir);
+	}
+	_project.spec.jars = fs.ls(libsdir, "*");	
 	
 	if (_project.spec.java != undefined) {
 		fs.symlink(_project.spec.java, path.join(_project.outpath, "java"));
 	} else {
 		fs.mkdir(path.join(_project.outpath, "java"));
 	}
+	source_dirs.push("java");
+	
 	fs.mkdir(path.join(_project.outpath, "gen"));
 	fs.mkdir(path.join(_project.outpath, "bin/classes"));
 	
 	fs.write(path.join(_project.outpath, ".classpath"), Mustache.render(dot_classpath_tpl, _project));
 	fs.write(path.join(_project.outpath, ".project"), Mustache.render(dot_project_tpl, _project));
+	
+	fs.write(path.join(_project.outpath, "ant.properties"), "source.dir=" + source_dirs.join(":"));
 	
 	this.genManifest(_project);
 }
