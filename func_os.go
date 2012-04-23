@@ -72,12 +72,18 @@ func os_run(value ...interface{}) interface{} {
   if err != nil {
 		panic(err.Error())
   }
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		panic(err.Error())
+	}
   err = cmd.Start()
   if err != nil {
 		panic(err.Error())
   }
+	
 	go io.Copy(os.Stdout, stdout) 
 	go io.Copy(os.Stderr, stderr) 
+	go io.Copy(stdin, os.Stdin)
   cmd.Wait()
 
   return true

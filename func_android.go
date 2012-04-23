@@ -249,7 +249,25 @@ AndroidGenerator.prototype.genProject = function(_project) {
 	fs.write(path.join(_project.outpath, ".classpath"), Mustache.render(dot_classpath_tpl, _project));
 	fs.write(path.join(_project.outpath, ".project"), Mustache.render(dot_project_tpl, _project));
 	
-	fs.write(path.join(_project.outpath, "ant.properties"), "source.dir=" + source_dirs.join(":"));
+	if (_project.spec.android != undefined) {
+		var ant_tpl = "\
+source.dir={{sources}}\n\
+{{#keystore}}\n\
+key.store={{keystore}}\n\
+{{/keystore}}\n\
+{{#keyalias}}\n\
+key.alias={{keyalias}}\n\
+{{/keyalias}}\n\
+";
+
+		var ant_props = {
+				sources: source_dirs.join(":"),
+				keystore: _project.spec.android.keystore,
+				keyalias: _project.spec.android.keyalias
+			};
+	
+		fs.write(path.join(_project.outpath, "ant.properties"), Mustache.render(ant_tpl, ant_props));
+	}
 	
 	this.genManifest(_project);
 }
