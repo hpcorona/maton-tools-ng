@@ -5,6 +5,7 @@ import (
 	"github.com/hpcorona/go-v8"
 	"os"
 	"os/exec"
+	"io"
 )
 
 func load_os_functions(ctx *v8.V8Context) {
@@ -63,15 +64,21 @@ func os_run(value ...interface{}) interface{} {
   fmt.Println()
 
 	cmd := exec.Command(value[0].(string), strs...)
-	err := cmd.Run()
-	if err != nil {
+	stdout, err := cmd.StdoutPipe()
+  if err != nil {
 		panic(err.Error())
-	}
-
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		fmt.Printf("%s\n", string(out))
-	}
+  }
+  stderr, err := cmd.StderrPipe()
+  if err != nil {
+		panic(err.Error())
+  }
+  err = cmd.Start()
+  if err != nil {
+		panic(err.Error())
+  }
+	go io.Copy(os.Stdout, stdout) 
+	go io.Copy(os.Stderr, stderr) 
+  cmd.Wait()
 
   return true
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/hpcorona/go-v8"
+	"fmt"
 	)
 
 var library = 
@@ -23,6 +24,7 @@ function extend(from, to) {
 }
 
 function Project(_name, _type, _basepath) {
+	this.root = ng.wd();
   this.name = _name;
   this.type = _type;
   this.basepath = path.join(ng.wd(), _basepath);
@@ -158,10 +160,18 @@ Project.prototype = {
 		
 		generate: function() {
 			this.generator.generate(this);
+			
+			if (this.postgenerate != undefined) {
+				this.postgenerate();
+			}
 		},
 		
 		finalize: function() {
 			this.generator.finalize(this);
+			
+			if (this.postfinalize != undefined) {
+				this.postfinalize();
+			}
 		}
 }
 
@@ -290,6 +300,12 @@ var Library = (typeof module !== "undefined" && module.exports) || {};
 		}
 	}
 	
+	exports.build = function() {
+		this.configure();
+		this.generate();
+		this.finalize();
+	}
+	
 })(Library);
 
 function Generator() {
@@ -309,5 +325,9 @@ Generator.prototype = {
 `
 	
 func load_library_functions(ctx *v8.V8Context) {
-	ctx.Eval(library)
+	_,err := ctx.Eval(library)
+	if err != nil {
+    fmt.Printf("=====\nERROR\n=====\n%s:%s", "internal library", err.Error())
+    return
+  }
 }

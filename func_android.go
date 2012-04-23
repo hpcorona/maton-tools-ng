@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/hpcorona/go-v8"
+	"fmt"
 	)
 
 var android = 
@@ -22,6 +23,78 @@ AndroidGenerator.prototype.workspace = function(_path) {
 	for (var i in Library.buildStack) {
 		fs.mkdir(path.join(projsdir, Library.buildStack[i], "org.eclipse.jdt.core"));
 	}
+}
+
+AndroidGenerator.prototype.genManifest = function(_project) {
+	if (_project.spec.android == null) return;
+	
+	var manifest_tpl = '\
+<?xml version="1.0" encoding="utf-8"?>\n\
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"\n\
+    package="{{spec.android.package}}"\n\
+    android:versionCode="{{spec.app.versionCode}}"\n\
+    android:versionName="{{spec.app.versionName}}">\n\
+{{#spec.android.permissions}}\n\
+    <uses-permission android:name="{{.}}" />\n\
+{{/spec.android.permissions}}\n\
+    <uses-sdk android:minSdkVersion="{{spec.android.version}}" android:targetSdkVersion="{{spec.android.version}}"/>\n\
+{{#spec.android.gles2}}\n\
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />\n\
+{{/spec.android.gles2}}\n\
+\n\
+    <application\n\
+        android:icon="@drawable/ic_launcher"\n\
+        android:label="@string/app_label" android:allowClearUserData="true">\n\
+        <activity\n\
+            android:name=".{{spec.android.activity}}"\n\
+            android:screenOrientation="portrait"\n\
+            android:label="@string/app_name" >\n\
+            <intent-filter>\n\
+                <action android:name="android.intent.action.MAIN" />\n\
+                <category android:name="android.intent.category.LAUNCHER" />\n\
+            </intent-filter>\n\
+        </activity>\n\
+    </application>\n\
+</manifest>\n\
+';
+	fs.write(path.join(_project.outpath, "AndroidManifest.xml"), Mustache.render(manifest_tpl, _project));
+	
+	var res_ldpi = path.join(_project.outpath, "res", "drawable-ldpi");
+	var res_mdpi = path.join(_project.outpath, "res", "drawable-mdpi");
+	var res_hdpi = path.join(_project.outpath, "res", "drawable-hdpi");
+	var layout = path.join(_project.outpath, "res", "layout");
+	var values = path.join(_project.outpath, "res", "values");
+	var assets = path.join(_project.outpath, "assets");
+	
+	fs.mkdir(res_ldpi);
+	fs.mkdir(res_mdpi);
+	fs.mkdir(res_hdpi);
+	fs.mkdir(layout);
+	fs.mkdir(values);
+	fs.mkdir(assets);
+	
+	if (_project.spec.android.icon != undefined) {
+		if (_project.spec.android.icon.ldpi != null) {
+			fs.cp(_project.spec.android.icon.ldpi, path.join(res_ldpi, "ic_launcher.png"));
+		}
+		if (_project.spec.android.icon.mdpi != null) {
+			fs.cp(_project.spec.android.icon.mdpi, path.join(res_mdpi, "ic_launcher.png"));
+		}
+		if (_project.spec.android.icon.hdpi != null) {
+			fs.cp(_project.spec.android.icon.hdpi, path.join(res_hdpi, "ic_launcher.png"));
+		}
+	}
+	
+	var strings_tpl = '\
+<?xml version="1.0" encoding="utf-8"?>\n\
+<resources>\n\
+  <string name="app_name">{{spec.app.name}}</string>\n\
+  <string name="app_label">{{spec.app.label}}</string>\n\
+</resources>\
+';
+
+	fs.write(path.join(values, "strings.xml"), Mustache.render(strings_tpl, _project));
+	fs.write(path.join(_project.outpath, "lint.xml"), ['<?xml version="1.0" encoding="UTF-8"?>',"<lint>","</lint>"]);
 }
 
 AndroidGenerator.prototype.genProject = function(_project) {
@@ -153,23 +226,22 @@ AndroidGenerator.prototype.genProject = function(_project) {
 			<location>{{location}}</location>\n\
 		</link>\n\
 {{/spec.linked_sources}}\n\
-{{#spec.java}}\n\
-		<link>\n\
-			<name>code</name>\n\
-			<type>2</type>\n\
-			<location>{{spec.java}}</location>\n\
-		</link>\n\
-{{/spec.java}}\n\
 	</linkedResources>\n\
 </projectDescription>\n\
 ';
 	
-	fs.mkdir(path.join(_project.outpath, "java"));
+	if (_project.spec.java != undefined) {
+		fs.symlink(_project.spec.java, path.join(_project.outpath, "java"));
+	} else {
+		fs.mkdir(path.join(_project.outpath, "java"));
+	}
 	fs.mkdir(path.join(_project.outpath, "gen"));
 	fs.mkdir(path.join(_project.outpath, "bin/classes"));
 	
 	fs.write(path.join(_project.outpath, ".classpath"), Mustache.render(dot_classpath_tpl, _project));
 	fs.write(path.join(_project.outpath, ".project"), Mustache.render(dot_project_tpl, _project));
+	
+	this.genManifest(_project);
 }
 
 AndroidGenerator.prototype.generate = function(_project) {
@@ -263,7 +335,7 @@ APP_EXPORT_CFLAGS += -g\n\
 	fs.write(path.join(android.path, "jni", "Application.mk"), Mustache.render(application_mk_tpl, android));
 	
 	var project_properties_tpl = "\
-target={{spec.android_version}}\
+target=android-{{spec.android.version}}\
 ";
 
 	fs.write(path.join(android.path, "project.properties"), Mustache.render(project_properties_tpl, android));
@@ -423,10 +495,23 @@ AndroidGenerator.prototype.genRealDepends = function(_project) {
 }
 
 AndroidGenerator.prototype.finalize = function(_project) {
+	if (_project.type != "application") return;
 	
+	var ANDROID_CMD = os.findCmd("android");
+	os.run(ANDROID_CMD, "update", "project", "-p", _project.outpath);
+	
+	os.log("Fixing APK name...");
+	var build = path.join(_project.outpath, "build.xml");
+	var content = fs.read(build);
+	content = content.replace(_project.spec.android.activity, _project.spec.android.apk);
+	fs.write(build, content);
 }
 `
 	
 func load_android_functions(ctx *v8.V8Context) {
-	ctx.Eval(android)
+	_,err := ctx.Eval(android)
+	if err != nil {
+    fmt.Printf("=====\nERROR\n=====\n%s:%s", "internal android", err.Error())
+    return
+  }
 }

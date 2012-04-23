@@ -59,7 +59,7 @@ func load_fs_functions(ctx *v8.V8Context) {
 func fs_cd(value ...interface{}) interface{} {
 	paramCount(value, 1, "fs.cd")
 
-  fmt.Printf("Change current directory to '%s'.", value[0].(string))
+  fmt.Printf("Change current directory to '%s'.\n", value[0].(string))
 
 	os.Chdir(value[0].(string))
 
@@ -389,6 +389,8 @@ func fs_write(value ...interface{}) interface{} {
 	}
 	
 	writer.Flush()
+	
+	fmt.Printf("Writing '%s' file.\n", value[0].(string))
 	
 	return true
 }
