@@ -138,6 +138,8 @@ Project.prototype = {
 					c.func(config, _config, _platform);
 				} else if (c.config == _config && (c.platform == undefined || c.platform == _platform)) {
 					c.func(config, _config, _platform);
+				} else if (c.config == undefined && c.platform == undefined) {
+					c.func(config, _config, _platform);
 				}
 			}
 			
