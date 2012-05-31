@@ -32,15 +32,22 @@ AndroidGenerator.prototype.genManifest = function(_project) {
 <?xml version="1.0" encoding="utf-8"?>\n\
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"\n\
     package="{{spec.android.package}}"\n\
+		android:installLocation="preferExternal"\n\
     android:versionCode="{{spec.app.versionCode}}"\n\
     android:versionName="{{spec.app.versionName}}">\n\
 {{#spec.android.permissions}}\n\
     <uses-permission android:name="{{.}}" />\n\
 {{/spec.android.permissions}}\n\
-    <uses-sdk android:minSdkVersion="{{spec.android.version}}" android:targetSdkVersion="{{spec.android.version}}"/>\n\
+    <uses-sdk android:minSdkVersion="{{spec.android.version.min}}" android:targetSdkVersion="{{spec.android.version.target}}"/>\n\
 {{#spec.android.gles2}}\n\
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />\n\
 {{/spec.android.gles2}}\n\
+		<supports-screens android:resizeable="false"\n\
+			android:smallScreens="true"\n\
+			android:normalScreens="true"\n\
+			android:largeScreens="true"\n\
+			android:xlargeScreens="true"\n\
+			android:anyDensity="true" />\n\
 \n\
     <application\n\
         android:icon="@drawable/ic_launcher"\n\
@@ -287,6 +294,7 @@ AndroidGenerator.prototype.generate = function(_project) {
 		ldlibs: [].concat(_project.ldlibs),
 		ldflags: [].concat(_project.ldflags),
 		defines: [].concat(_project.defines),
+		flags: [].concat(_project.flags),
 		module: _project.module,
 		modules: this.genModules(),
 		libtype: (_project.type == "application" || _project.type == "shared" ? "BUILD_SHARED_LIBRARY" : "BUILD_STATIC_LIBRARY"),
@@ -317,6 +325,9 @@ include $(CLEAR_VARS)\n\
 {{#defines}}\n\
 LOCAL_CFLAGS += -D{{.}}\n\
 {{/defines}}\n\
+{{#flags}}\n\
+LOCAL_CFLAGS += {{.}}\n\
+{{/flags}}\n\
 \n\
 {{#includes}}\n\
 LOCAL_C_INCLUDES +=	{{.}}\n\
@@ -352,18 +363,20 @@ include $({{libtype}})\n\
 	if (_project.type != "application") return;
 	
 	var application_mk_tpl = "\
+APP_ABI := armeabi armeabi-v7a x86\n\
 {{#modules}}\n\
 APP_MODULES += {{.}}\n\
 {{/modules}}\n\
 APP_STL := gnustl_static\n\
 APP_OPTIM := {{configuration}}\n\
 APP_EXPORT_CFLAGS += -g\n\
+APP_GNUSTL_FORCE_CPP_FEATURES := exceptions rtti\n\
 ";
 	
 	fs.write(path.join(android.path, "jni", "Application.mk"), Mustache.render(application_mk_tpl, android));
 	
 	var project_properties_tpl = "\
-target=android-{{spec.android.version}}\
+target=android-{{spec.android.version.target}}\
 ";
 
 	fs.write(path.join(android.path, "project.properties"), Mustache.render(project_properties_tpl, android));
